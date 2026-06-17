@@ -9,6 +9,7 @@ import { SourceLogo, Favicon, Thumbnail } from '@/components/source-icon'
 import { useOpenInPane, usePrefetchOnHover } from '@/components/reader-pane'
 import { useActiveDigest } from '@/lib/active-digest'
 import { domainOf } from '@/lib/favicon'
+import { safeHref } from '@/lib/utils'
 import {
   Tooltip,
   TooltipContent,
@@ -133,7 +134,7 @@ function VideoCard({ item }: { item: Doc<'items'> }) {
   // Videos open in a new tab (reader mode is meaningless for them).
   return (
     <a
-      href={item.url}
+      href={safeHref(item.url)}
       target="_blank"
       rel="noreferrer"
       className="group block"
@@ -200,7 +201,7 @@ function DigestRow({
             <Tooltip>
               <TooltipTrigger asChild>
                 <a
-                  href={item.url}
+                  href={safeHref(item.url)}
                   target="_blank"
                   rel="noreferrer"
                   className="font-medium text-foreground underline-offset-4 group-hover:underline"
@@ -212,7 +213,7 @@ function DigestRow({
             </Tooltip>
           ) : (
             <a
-              href={item.url}
+              href={safeHref(item.url)}
               target="_blank"
               rel="noreferrer"
               {...hover}
@@ -226,7 +227,7 @@ function DigestRow({
             <Tooltip>
               <TooltipTrigger asChild>
                 <a
-                  href={item.websiteUrl}
+                  href={safeHref(item.websiteUrl)}
                   target="_blank"
                   rel="noreferrer"
                   className="shrink-0 text-muted-foreground hover:text-foreground"

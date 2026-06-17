@@ -6,6 +6,7 @@ import { api, internal } from './_generated/api'
 import { v } from 'convex/values'
 import type { Doc } from './_generated/dataModel'
 import { toEditionSections } from './editions'
+import { safeHref } from './filtering'
 
 type Section = { source: Doc<'sources'>; items: Doc<'items'>[] }
 
@@ -186,9 +187,14 @@ function renderEmail(digest: Doc<'digests'>, sections: Section[]): string {
             item.excerpt && (section.source.showDescription ?? true)
               ? `<div style="font-size:13px;color:#555;margin-top:3px">${esc(item.excerpt)}</div>`
               : ''
+          const href = safeHref(item.url)
+          const titleStyle = 'font-size:15px;font-weight:600;color:#111;text-decoration:none'
+          const titleHtml = href
+            ? `<a href="${esc(href)}" style="${titleStyle}">${esc(item.title)}</a>`
+            : `<span style="${titleStyle}">${esc(item.title)}</span>`
           return `
             <li style="margin:0 0 14px">
-              <a href="${esc(item.url)}" style="font-size:15px;font-weight:600;color:#111;text-decoration:none">${esc(item.title)}</a>
+              ${titleHtml}
               ${metaLine}
               ${excerpt}
             </li>`

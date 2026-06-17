@@ -1,5 +1,17 @@
 import type { Doc } from './_generated/dataModel'
 
+// Only allow http/https URLs in an href (item links come from external feeds;
+// a `javascript:` URL would be an XSS vector). Returns undefined otherwise.
+export function safeHref(url?: string | null): string | undefined {
+  if (!url) return undefined
+  try {
+    const p = new URL(url)
+    return p.protocol === 'http:' || p.protocol === 'https:' ? url : undefined
+  } catch {
+    return undefined
+  }
+}
+
 // Normalize a URL for cross-source dedup: lowercase host (sans www), strip the
 // trailing slash, drop query/hash. Returns the trimmed input on parse failure.
 export function dedupeKey(url: string): string {

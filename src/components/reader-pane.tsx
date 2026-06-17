@@ -13,7 +13,7 @@ import { useAction } from 'convex/react'
 import DOMPurify from 'dompurify'
 import { BookOpen, ExternalLink, Loader2, X } from 'lucide-react'
 import { api } from '../../convex/_generated/api'
-import { cn } from '@/lib/utils'
+import { cn, safeHref } from '@/lib/utils'
 
 export type ReaderItem = {
   url: string
@@ -191,7 +191,7 @@ function ReaderPaneBody({ item, onClose }: { item: ReaderItem; onClose: () => vo
           {item.title}
         </p>
         <a
-          href={item.url}
+          href={safeHref(item.url)}
           target="_blank"
           rel="noreferrer"
           className="shrink-0 rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
@@ -219,7 +219,7 @@ function ReaderPaneBody({ item, onClose }: { item: ReaderItem; onClose: () => vo
           <div className="py-16 text-center text-sm text-muted-foreground">
             <p>{error}</p>
             <a
-              href={item.url}
+              href={safeHref(item.url)}
               target="_blank"
               rel="noreferrer"
               className="mt-3 inline-flex items-center gap-1 underline"

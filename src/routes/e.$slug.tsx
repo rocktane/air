@@ -4,6 +4,7 @@ import { convexQuery } from '@convex-dev/react-query'
 import { ArrowUp, MessageSquare } from 'lucide-react'
 import { api } from '../../convex/_generated/api'
 import { Separator } from '@/components/ui/separator'
+import { safeHref } from '@/lib/utils'
 
 export const Route = createFileRoute('/e/$slug')({
   component: EditionView,
@@ -50,7 +51,7 @@ function EditionView() {
                 {section.items.map((item, j) => (
                   <li key={j}>
                     <a
-                      href={item.url}
+                      href={safeHref(item.url)}
                       target="_blank"
                       rel="noreferrer"
                       className="font-medium text-foreground underline-offset-4 hover:underline"
