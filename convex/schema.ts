@@ -29,9 +29,55 @@ export const websiteStrategy = v.union(
   }),
 )
 
+// Send cadence for a digest's scheduled email.
+export const digestSchedule = v.union(
+  v.literal('daily'),
+  v.literal('weekly'),
+  v.literal('off'),
+)
+
+// Snapshot of one item inside an archived edition (display fields only).
+export const editionItem = v.object({
+  title: v.string(),
+  url: v.string(),
+  author: v.optional(v.string()),
+  publishedAt: v.optional(v.number()),
+  score: v.optional(v.number()),
+  commentsCount: v.optional(v.number()),
+  excerpt: v.optional(v.string()),
+  imageUrl: v.optional(v.string()),
+  websiteUrl: v.optional(v.string()),
+})
+
+export const editionSection = v.object({
+  sourceName: v.string(),
+  sourceType,
+  items: v.array(editionItem),
+})
+
 export default defineSchema({
+  // A "brew": an independent digest with its own sources, schedule and filters.
+  digests: defineTable({
+    name: v.string(),
+    enabled: v.boolean(),
+    position: v.number(),
+    // Scheduled email delivery (feature: Brevo + cron).
+    schedule: digestSchedule,
+    timezone: v.string(), // IANA tz, e.g. 'Europe/Paris'
+    sendHour: v.optional(v.number()), // 0-23 local hour to send (default 8)
+    weekday: v.optional(v.number()), // 0=Sun…6=Sat, used when schedule = weekly
+    emailTo: v.optional(v.string()),
+    lastSentAt: v.optional(v.number()), // epoch ms of last successful send
+    // Noise filters applied to every source in this digest.
+    includeKeywords: v.optional(v.array(v.string())),
+    excludeKeywords: v.optional(v.array(v.string())),
+    minScore: v.optional(v.number()),
+    dedupe: v.optional(v.boolean()), // drop the same link appearing in 2+ sources
+  }).index('by_position', ['position']),
+
   // One row per configured source.
   sources: defineTable({
+    digestId: v.optional(v.id('digests')), // owning digest (backfilled on migration)
     type: sourceType,
     name: v.string(),
     url: v.optional(v.string()), // feed/page url, or topic for producthunt
@@ -46,7 +92,13 @@ export default defineSchema({
     includeShorts: v.optional(v.boolean()), // youtube: include Shorts in the digest (default true)
     showDescription: v.optional(v.boolean()), // blogs/sites: show article excerpt (default true)
     maxItems: v.optional(v.number()), // per-source item cap shown in the digest
-  }).index('by_position', ['position']),
+    // Per-source noise filters (layered on top of the digest-level ones).
+    includeKeywords: v.optional(v.array(v.string())),
+    excludeKeywords: v.optional(v.array(v.string())),
+    minScore: v.optional(v.number()),
+  })
+    .index('by_position', ['position'])
+    .index('by_digest_and_position', ['digestId', 'position']),
 
   // Normalized content items collected from sources.
   items: defineTable({
@@ -67,7 +119,19 @@ export default defineSchema({
     .index('by_source_published', ['sourceId', 'publishedAt'])
     .index('by_source_score', ['sourceId', 'score']),
 
-  // Single-user settings for the POC.
+  // Frozen snapshot of a digest at publish time — browsable archive + public
+  // share. Written once, never grows, so the nested arrays stay bounded.
+  editions: defineTable({
+    digestId: v.id('digests'),
+    digestName: v.string(), // denormalized: edition survives a rename/delete
+    slug: v.string(), // unguessable public share token
+    createdAt: v.number(),
+    sections: v.array(editionSection),
+  })
+    .index('by_digest_and_createdAt', ['digestId', 'createdAt'])
+    .index('by_slug', ['slug']),
+
+  // Single-user global settings for the POC.
   settings: defineTable({
     schedule: v.union(v.literal('daily'), v.literal('weekly')),
     timezone: v.string(),

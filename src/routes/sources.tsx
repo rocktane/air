@@ -76,6 +76,7 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { SourceLogo } from '@/components/source-icon'
 import { domainOf } from '@/lib/favicon'
+import { useActiveDigest } from '@/lib/active-digest'
 
 export const Route = createFileRoute('/sources')({
   component: SourcesPage,
@@ -134,14 +135,17 @@ function detectSource(input: string): { type: SourceType; url: string; name: str
 }
 
 function SourcesPage() {
-  const { data: sources, isPending } = useQuery(convexQuery(api.sources.list, {}))
+  const { activeId } = useActiveDigest()
+  const { data: sources, isPending } = useQuery(
+    convexQuery(api.sources.list, { digestId: activeId }),
+  )
   const ensureSeeded = useMutation(api.sources.ensureSeeded)
   const reorder = useMutation(api.sources.reorder)
 
-  // Make sure the curated presets always exist (disabled) for the user to toggle.
+  // Make sure the curated presets always exist (disabled) in the active digest.
   useEffect(() => {
-    ensureSeeded({}).catch(() => {})
-  }, [ensureSeeded])
+    if (activeId) ensureSeeded({ digestId: activeId }).catch(() => {})
+  }, [ensureSeeded, activeId])
 
   // Local ordering for instant drag feedback; re-adopt the server order whenever
   // the set of sources changes (add / remove / first load), without an effect.
@@ -180,7 +184,7 @@ function SourcesPage() {
             Active les sources, règle-les, et glisse pour réordonner.
           </p>
         </div>
-        <AddSourceDialog />
+        <AddSourceDialog digestId={activeId} />
       </div>
 
       {isPending ? (
@@ -637,7 +641,7 @@ function EditSourceDialog({
   )
 }
 
-function AddSourceDialog() {
+function AddSourceDialog({ digestId }: { digestId: Id<'digests'> | undefined }) {
   const addSource = useMutation(api.sources.add)
   const refresh = useAction(api.fetchers.refreshSource)
   const [open, setOpen] = useState(false)
@@ -649,10 +653,11 @@ function AddSourceDialog() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!detected) return
+    if (!detected || !digestId) return
     setSubmitting(true)
     try {
       const id = await addSource({
+        digestId,
         type: detected.type,
         url: detected.url,
         name: name.trim() || detected.name,

@@ -8,8 +8,13 @@
  * @module
  */
 
+import type * as crons from "../crons.js";
 import type * as digest from "../digest.js";
+import type * as digests from "../digests.js";
+import type * as editions from "../editions.js";
+import type * as email from "../email.js";
 import type * as fetchers from "../fetchers.js";
+import type * as filtering from "../filtering.js";
 import type * as items from "../items.js";
 import type * as reader from "../reader.js";
 import type * as settings from "../settings.js";
@@ -23,8 +28,13 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  crons: typeof crons;
   digest: typeof digest;
+  digests: typeof digests;
+  editions: typeof editions;
+  email: typeof email;
   fetchers: typeof fetchers;
+  filtering: typeof filtering;
   items: typeof items;
   reader: typeof reader;
   settings: typeof settings;

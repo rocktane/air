@@ -6,7 +6,8 @@ import { api } from '../../convex/_generated/api'
 import type { Doc } from '../../convex/_generated/dataModel'
 import { Separator } from '@/components/ui/separator'
 import { SourceLogo, Favicon, Thumbnail } from '@/components/source-icon'
-import { ArticleReader } from '@/components/article-reader'
+import { useOpenInPane, usePrefetchOnHover } from '@/components/reader-pane'
+import { useActiveDigest } from '@/lib/active-digest'
 import { domainOf } from '@/lib/favicon'
 import {
   Tooltip,
@@ -33,7 +34,10 @@ const SOURCE_EMOJI: Record<string, string> = {
 const SCORED = new Set(['producthunt', 'hackernews', 'devto', 'subreddit'])
 
 function Dashboard() {
-  const { data: sections, isPending } = useQuery(convexQuery(api.digest.latest, {}))
+  const { activeId, active } = useActiveDigest()
+  const { data: sections, isPending } = useQuery(
+    convexQuery(api.digest.latest, { digestId: activeId }),
+  )
   const today = new Date().toLocaleDateString('fr-FR', {
     weekday: 'long',
     day: 'numeric',
@@ -45,7 +49,7 @@ function Dashboard() {
   return (
     <div className="space-y-8">
       <header className="space-y-1 text-center">
-        <h1 className="text-2xl font-semibold">Mon digest</h1>
+        <h1 className="text-2xl font-semibold">{active?.name ?? 'Mon digest'}</h1>
         <p className="text-sm text-muted-foreground capitalize">{today}</p>
       </header>
 
@@ -126,6 +130,7 @@ function SourceSection({
 
 // YouTube layout: 2 per row, thumbnail on top, title then date below — no blurb.
 function VideoCard({ item }: { item: Doc<'items'> }) {
+  // Videos open in a new tab (reader mode is meaningless for them).
   return (
     <a
       href={item.url}
@@ -165,6 +170,10 @@ function DigestRow({
   const scored = SCORED.has(kind)
   const isPH = kind === 'producthunt'
   const domain = domainOf(item.url)
+  const openInPane = useOpenInPane()
+  const onTitleClick = openInPane({ url: item.url, title: item.title })
+  // Only blogs/sites open in the reader pane; everything else stays a new-tab link.
+  const hover = usePrefetchOnHover(item.url, kind === 'rss' || kind === 'website')
   // Blogs/sites keep only the date underneath. Other sources also surface the
   // author and (when there's no thumbnail) the article domain.
   const isBlog = kind === 'rss' || kind === 'website'
@@ -206,6 +215,8 @@ function DigestRow({
               href={item.url}
               target="_blank"
               rel="noreferrer"
+              {...hover}
+              onClick={isBlog ? onTitleClick : undefined}
               className="font-medium text-foreground underline-offset-4 group-hover:underline"
             >
               {item.title}
@@ -227,7 +238,6 @@ function DigestRow({
               <TooltipContent>Lien direct</TooltipContent>
             </Tooltip>
           )}
-          {isBlog && <ArticleReader url={item.url} title={item.title} />}
         </div>
 
         {/* Stats directly under the name (Product Hunt, Hacker News, …). */}

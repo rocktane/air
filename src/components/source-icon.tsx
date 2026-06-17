@@ -57,14 +57,17 @@ export function Thumbnail({
 }) {
   const [errored, setErrored] = useState(false)
   if (errored) return null
-  // Fill mode: a wrapper div (no intrinsic size) stretches to the row's content
-  // height; the image fills it absolutely. Avoids the img's intrinsic width
-  // blowing the square up.
+  // Fill mode: a fixed square the image covers. A previous version sized the
+  // square off the row's stretched height via `aspect-square self-stretch`, but
+  // a flex item's width (main axis) is resolved before its stretched height, so
+  // there was no definite height for `aspect-ratio` to turn into a width — the
+  // square collapsed to 0px wide and the image vanished. Product Hunt rows are a
+  // uniform height, so a fixed 64px square matches them exactly and reliably.
   if (fill) {
     return (
       <div
         className={cn(
-          'relative aspect-square shrink-0 self-stretch overflow-hidden rounded-md border bg-muted',
+          'relative size-16 shrink-0 overflow-hidden rounded-md border bg-muted',
           className,
         )}
       >

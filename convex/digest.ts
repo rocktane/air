@@ -1,5 +1,8 @@
 import { query } from './_generated/server'
+import { v } from 'convex/values'
+import type { Doc } from './_generated/dataModel'
 import { DEFAULT_MAX_ITEMS } from './settings'
+import { dedupeKey, keepItem } from './filtering'
 
 // Sources whose items are ranked by score (votes / points / reactions) rather
 // than recency. Everything else (feeds, sites, YouTube) ranks by recency.
@@ -11,42 +14,67 @@ const SCORE_RANKED = new Set(['producthunt', 'hackernews', 'devto', 'subreddit']
 const YOUTUBE_DEFAULT_MAX = 4
 const YOUTUBE_HARD_MAX = 4
 
-// Builds the digest on the fly: every enabled source with its top items. The
-// dashboard subscribes to this query for live updates. Each source caps its
-// items with its own `maxItems` (falling back to the global default); YouTube
-// is forced to an even count so the 2-per-row grid never leaves a gap.
+// Builds a digest on the fly: every enabled source (of the target digest) with
+// its top items, after applying the digest's keyword/score filters and an
+// optional cross-source dedup. The dashboard subscribes to this query for live
+// updates.
 export const latest = query({
-  args: {},
-  handler: async (ctx) => {
+  args: { digestId: v.optional(v.id('digests')) },
+  handler: async (ctx, { digestId }) => {
     const settings = await ctx.db.query('settings').first()
     const fallback = settings?.maxItemsPerSource ?? DEFAULT_MAX_ITEMS
 
-    const sources = await ctx.db.query('sources').withIndex('by_position').collect()
+    // Target digest: explicit id, else the first one (migration / single digest).
+    const digest = digestId
+      ? await ctx.db.get(digestId)
+      : await ctx.db.query('digests').withIndex('by_position').first()
 
-    const sections = await Promise.all(
-      sources
-        .filter((source) => source.enabled)
-        .map(async (source) => {
-          let limit = source.maxItems ?? (source.type === 'youtube' ? YOUTUBE_DEFAULT_MAX : fallback)
-          if (source.type === 'youtube') {
-            limit = Math.min(limit, YOUTUBE_HARD_MAX)
-            if (limit % 2 === 1) limit = Math.max(2, limit - 1) // keep the 2-per-row grid even
-          }
+    const sources = digest
+      ? await ctx.db
+          .query('sources')
+          .withIndex('by_digest_and_position', (q) => q.eq('digestId', digest._id))
+          .collect()
+      : await ctx.db.query('sources').withIndex('by_position').collect()
 
-          const items = SCORE_RANKED.has(source.type)
-            ? await ctx.db
-                .query('items')
-                .withIndex('by_source_score', (q) => q.eq('sourceId', source._id))
-                .order('desc')
-                .take(limit)
-            : await ctx.db
-                .query('items')
-                .withIndex('by_source_published', (q) => q.eq('sourceId', source._id))
-                .order('desc')
-                .take(limit)
-          return { source, items }
-        }),
-    )
+    const dedupe = digest?.dedupe ?? false
+    const seen = new Set<string>() // cross-source dedup within this digest
+
+    const sections: { source: Doc<'sources'>; items: Doc<'items'>[] }[] = []
+    for (const source of sources) {
+      if (!source.enabled) continue
+
+      let limit = source.maxItems ?? (source.type === 'youtube' ? YOUTUBE_DEFAULT_MAX : fallback)
+      if (source.type === 'youtube') {
+        limit = Math.min(limit, YOUTUBE_HARD_MAX)
+        if (limit % 2 === 1) limit = Math.max(2, limit - 1) // keep the 2-per-row grid even
+      }
+
+      // Over-fetch a little so filtering/dedup still leaves us close to `limit`.
+      const raw = SCORE_RANKED.has(source.type)
+        ? await ctx.db
+            .query('items')
+            .withIndex('by_source_score', (q) => q.eq('sourceId', source._id))
+            .order('desc')
+            .take(limit + 8)
+        : await ctx.db
+            .query('items')
+            .withIndex('by_source_published', (q) => q.eq('sourceId', source._id))
+            .order('desc')
+            .take(limit + 8)
+
+      const items: Doc<'items'>[] = []
+      for (const it of raw) {
+        if (!keepItem(it, digest ?? {}, source)) continue
+        if (dedupe) {
+          const key = dedupeKey(it.url)
+          if (seen.has(key)) continue
+          seen.add(key)
+        }
+        items.push(it)
+        if (items.length >= limit) break
+      }
+      sections.push({ source, items })
+    }
 
     return sections
   },

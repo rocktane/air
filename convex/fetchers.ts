@@ -204,6 +204,26 @@ export const refreshAll = internalAction({
   },
 })
 
+// Refresh every enabled source of one digest, best-effort. Used by the cron
+// before rendering/sending that digest's email.
+export const refreshDigest = internalAction({
+  args: { digestId: v.id('digests') },
+  handler: async (ctx, { digestId }) => {
+    const sources = await ctx.runQuery(api.sources.list, { digestId })
+    const results: { name: string; ok: boolean }[] = []
+    for (const s of sources) {
+      if (!s.enabled) continue
+      try {
+        await refreshOne(ctx, s._id)
+        results.push({ name: s.name, ok: true })
+      } catch {
+        results.push({ name: s.name, ok: false })
+      }
+    }
+    return results
+  },
+})
+
 // --- Product Hunt -----------------------------------------------------------
 
 async function getProductHuntToken(): Promise<string> {
@@ -238,6 +258,15 @@ type PHNode = {
   thumbnail?: { url?: string } | null
 }
 
+// The API's `url` points at the launch page (…/products/<slug>/launches/<x>),
+// which Product Hunt renders as a modal overlaid on the product page. Strip the
+// `/launches/…` segment (and tracking query) so links land on the plain product
+// page instead — same content, no overlay. Falls back to the original url.
+function productHuntPageUrl(launchUrl: string): string {
+  const match = launchUrl.match(/producthunt\.com\/products\/([^/?#]+)/)
+  return match ? `https://www.producthunt.com/products/${match[1]}` : launchUrl
+}
+
 async function fetchProductHunt(): Promise<NormalizedItem[]> {
   const token = await getProductHuntToken()
   const query = `
@@ -267,10 +296,13 @@ async function fetchProductHunt(): Promise<NormalizedItem[]> {
   }
   if (json.errors?.length) throw new Error(`Product Hunt: ${json.errors[0].message}`)
   const edges = json.data?.posts?.edges ?? []
+  // `website` is Product Hunt's own tracking redirect (…/r/<token>) — the API
+  // never exposes the product's real URL. cleanItemUrl strips its query string
+  // before storage, leaving a bare …/r/<token> that still redirects in-browser.
   return edges.map(({ node }) => ({
     externalId: String(node.id),
     title: node.name,
-    url: node.url,
+    url: productHuntPageUrl(node.url),
     excerpt: node.tagline || undefined,
     score: node.votesCount,
     commentsCount: node.commentsCount,

@@ -8,8 +8,14 @@ import { v } from 'convex/values'
 import { sourceType, websiteStrategy } from './schema'
 
 export const list = query({
-  args: {},
-  handler: async (ctx) => {
+  args: { digestId: v.optional(v.id('digests')) },
+  handler: async (ctx, { digestId }) => {
+    if (digestId) {
+      return await ctx.db
+        .query('sources')
+        .withIndex('by_digest_and_position', (q) => q.eq('digestId', digestId))
+        .collect()
+    }
     return await ctx.db.query('sources').withIndex('by_position').collect()
   },
 })
@@ -24,14 +30,18 @@ const PRESETS: Array<{ type: 'producthunt' | 'hackernews' | 'devto'; name: strin
 
 // Idempotently insert any missing curated preset (disabled). Called on page load.
 export const ensureSeeded = mutation({
-  args: {},
-  handler: async (ctx) => {
-    const all = await ctx.db.query('sources').withIndex('by_position').collect()
+  args: { digestId: v.id('digests') },
+  handler: async (ctx, { digestId }) => {
+    const all = await ctx.db
+      .query('sources')
+      .withIndex('by_digest_and_position', (q) => q.eq('digestId', digestId))
+      .collect()
     let pos = all.reduce((max, s) => Math.max(max, s.position), -1)
     for (const preset of PRESETS) {
       if (all.some((s) => s.type === preset.type && !s.url)) continue
       pos += 1
       await ctx.db.insert('sources', {
+        digestId,
         type: preset.type,
         name: preset.name,
         enabled: false,
@@ -43,6 +53,7 @@ export const ensureSeeded = mutation({
 
 export const add = mutation({
   args: {
+    digestId: v.id('digests'),
     type: sourceType,
     name: v.string(),
     url: v.optional(v.string()),
@@ -52,7 +63,7 @@ export const add = mutation({
   handler: async (ctx, args) => {
     const last = await ctx.db
       .query('sources')
-      .withIndex('by_position')
+      .withIndex('by_digest_and_position', (q) => q.eq('digestId', args.digestId))
       .order('desc')
       .first()
     return await ctx.db.insert('sources', {
@@ -118,6 +129,20 @@ export const setMaxItems = mutation({
   },
 })
 
+// Per-source noise filters (layered on top of the digest-level ones). Empty
+// arrays clear keyword filters; minScore = 0 disables the threshold.
+export const setFilters = mutation({
+  args: {
+    id: v.id('sources'),
+    includeKeywords: v.optional(v.array(v.string())),
+    excludeKeywords: v.optional(v.array(v.string())),
+    minScore: v.optional(v.number()),
+  },
+  handler: async (ctx, { id, ...patch }) => {
+    await ctx.db.patch(id, patch)
+  },
+})
+
 // Persist a new display order (digest follows `position`).
 export const reorder = mutation({
   args: { ids: v.array(v.id('sources')) },
@@ -176,6 +201,7 @@ export const remove = mutation({
     await ctx.db.delete(id)
     // Restorable snapshot (no system fields) for the toast's Undo action.
     return {
+      digestId: source.digestId,
       type: source.type,
       name: source.name,
       url: source.url,
@@ -189,6 +215,9 @@ export const remove = mutation({
       includeShorts: source.includeShorts,
       showDescription: source.showDescription,
       maxItems: source.maxItems,
+      includeKeywords: source.includeKeywords,
+      excludeKeywords: source.excludeKeywords,
+      minScore: source.minScore,
       lastFetchedAt: source.lastFetchedAt,
     }
   },
@@ -197,6 +226,7 @@ export const remove = mutation({
 // Re-insert a source removed by mistake (Undo).
 export const restore = mutation({
   args: {
+    digestId: v.optional(v.id('digests')),
     type: sourceType,
     name: v.string(),
     url: v.optional(v.string()),
@@ -210,6 +240,9 @@ export const restore = mutation({
     includeShorts: v.optional(v.boolean()),
     showDescription: v.optional(v.boolean()),
     maxItems: v.optional(v.number()),
+    includeKeywords: v.optional(v.array(v.string())),
+    excludeKeywords: v.optional(v.array(v.string())),
+    minScore: v.optional(v.number()),
     lastFetchedAt: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
