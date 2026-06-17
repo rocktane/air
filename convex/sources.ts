@@ -143,6 +143,28 @@ export const setFilters = mutation({
   },
 })
 
+// Per-source display options (layout, density, what to show, sort order).
+export const setDisplay = mutation({
+  args: {
+    id: v.id('sources'),
+    displayMode: v.optional(
+      v.union(v.literal('title'), v.literal('excerpt'), v.literal('full')),
+    ),
+    layout: v.optional(
+      v.union(v.literal('list'), v.literal('cards'), v.literal('grid')),
+    ),
+    density: v.optional(v.union(v.literal('comfortable'), v.literal('compact'))),
+    showImage: v.optional(v.boolean()),
+    showMeta: v.optional(v.boolean()),
+    sortOrder: v.optional(
+      v.union(v.literal('popular'), v.literal('recent'), v.literal('hybrid')),
+    ),
+  },
+  handler: async (ctx, { id, ...patch }) => {
+    await ctx.db.patch(id, patch)
+  },
+})
+
 // Persist a new display order (digest follows `position`).
 export const reorder = mutation({
   args: { ids: v.array(v.id('sources')) },
@@ -218,6 +240,12 @@ export const remove = mutation({
       includeKeywords: source.includeKeywords,
       excludeKeywords: source.excludeKeywords,
       minScore: source.minScore,
+      displayMode: source.displayMode,
+      layout: source.layout,
+      density: source.density,
+      showImage: source.showImage,
+      showMeta: source.showMeta,
+      sortOrder: source.sortOrder,
       lastFetchedAt: source.lastFetchedAt,
     }
   },
@@ -243,6 +271,18 @@ export const restore = mutation({
     includeKeywords: v.optional(v.array(v.string())),
     excludeKeywords: v.optional(v.array(v.string())),
     minScore: v.optional(v.number()),
+    displayMode: v.optional(
+      v.union(v.literal('title'), v.literal('excerpt'), v.literal('full')),
+    ),
+    layout: v.optional(
+      v.union(v.literal('list'), v.literal('cards'), v.literal('grid')),
+    ),
+    density: v.optional(v.union(v.literal('comfortable'), v.literal('compact'))),
+    showImage: v.optional(v.boolean()),
+    showMeta: v.optional(v.boolean()),
+    sortOrder: v.optional(
+      v.union(v.literal('popular'), v.literal('recent'), v.literal('hybrid')),
+    ),
     lastFetchedAt: v.optional(v.number()),
   },
   handler: async (ctx, args) => {

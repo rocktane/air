@@ -38,6 +38,7 @@ import {
   Rss,
   Globe,
   MessageCircle,
+  SlidersHorizontal,
 } from 'lucide-react'
 import { api } from '../../convex/_generated/api'
 import type { Doc, Id } from '../../convex/_generated/dataModel'
@@ -74,6 +75,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { Switch } from '@/components/ui/switch'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { SourceLogo } from '@/components/source-icon'
 import { domainOf } from '@/lib/favicon'
 import { useActiveDigest } from '@/lib/active-digest'
@@ -256,7 +259,6 @@ function EditableName({ source }: { source: Doc<'sources'> }) {
 function SourceRow({ source }: { source: Doc<'sources'> }) {
   const setEnabled = useMutation(api.sources.setEnabled)
   const setIncludeShorts = useMutation(api.sources.setIncludeShorts)
-  const setShowDescription = useMutation(api.sources.setShowDescription)
   const setMaxItems = useMutation(api.sources.setMaxItems)
   const removeSource = useMutation(api.sources.remove)
   const restoreSource = useMutation(api.sources.restore)
@@ -264,6 +266,7 @@ function SourceRow({ source }: { source: Doc<'sources'> }) {
   const [busy, setBusy] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
+  const [displayOpen, setDisplayOpen] = useState(false)
 
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: source._id })
@@ -271,7 +274,6 @@ function SourceRow({ source }: { source: Doc<'sources'> }) {
   const meta = KIND_META[source.type]
   const Icon = meta.icon
   const isYoutube = source.type === 'youtube'
-  const isBlog = source.type === 'rss' || source.type === 'website'
 
   // Per-source item cap. YouTube only offers 2 or 4 (the RSS feed yields few
   // long-form videos, and the digest grids them two per row).
@@ -429,6 +431,10 @@ function SourceRow({ source }: { source: Doc<'sources'> }) {
                 <Pencil className="size-4" />
                 Éditer
               </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => setDisplayOpen(true)}>
+                <SlidersHorizontal className="size-4" />
+                Affichage…
+              </DropdownMenuItem>
               {source.needsManualScan && (
                 <DropdownMenuItem disabled={busy} onSelect={() => handleRefresh(true)}>
                   <Sparkles className="size-4" />
@@ -476,19 +482,6 @@ function SourceRow({ source }: { source: Doc<'sources'> }) {
                   Shorts
                 </DropdownMenuCheckboxItem>
               )}
-              {isBlog && (
-                <DropdownMenuCheckboxItem
-                  checked={source.showDescription ?? true}
-                  onCheckedChange={(value) =>
-                    setShowDescription({ id: source._id, value }).catch(() =>
-                      toast.error('Échec de la mise à jour'),
-                    )
-                  }
-                  onSelect={(e) => e.preventDefault()}
-                >
-                  Description
-                </DropdownMenuCheckboxItem>
-              )}
               <DropdownMenuCheckboxItem
                 checked={source.enabled}
                 onCheckedChange={(enabled) =>
@@ -513,6 +506,7 @@ function SourceRow({ source }: { source: Doc<'sources'> }) {
       </Card>
 
       <EditSourceDialog source={source} open={editOpen} onOpenChange={setEditOpen} />
+      <DisplaySettingsDialog source={source} open={displayOpen} onOpenChange={setDisplayOpen} />
 
       <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <AlertDialogContent>
@@ -636,6 +630,124 @@ function EditSourceDialog({
             </Button>
           </DialogFooter>
         </form>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+type LayoutOpt = 'list' | 'cards' | 'grid'
+type DensityOpt = 'comfortable' | 'compact'
+type DisplayModeOpt = 'title' | 'excerpt' | 'full'
+type SortOpt = 'popular' | 'recent' | 'hybrid'
+
+const SCORED_TYPES = new Set(['producthunt', 'hackernews', 'devto', 'subreddit'])
+
+function SettingRow({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex items-center justify-between gap-4">
+      <Label className="text-sm font-normal">{label}</Label>
+      {children}
+    </div>
+  )
+}
+
+// Per-source display options: layout, density, content level, sort, image/meta.
+function DisplaySettingsDialog({
+  source,
+  open,
+  onOpenChange,
+}: {
+  source: Doc<'sources'>
+  open: boolean
+  onOpenChange: (open: boolean) => void
+}) {
+  const setDisplay = useMutation(api.sources.setDisplay)
+  const isBlog = source.type === 'rss' || source.type === 'website'
+  const isVideo = source.type === 'youtube'
+
+  const layout = source.layout ?? (isVideo ? 'grid' : 'list')
+  const density = source.density ?? 'comfortable'
+  const displayMode = source.displayMode ?? (source.showDescription === false ? 'title' : 'excerpt')
+  const sortOrder = source.sortOrder ?? (SCORED_TYPES.has(source.type) ? 'popular' : 'recent')
+  const showImage = source.showImage ?? true
+  const showMeta = source.showMeta ?? true
+
+  function save(patch: {
+    layout?: LayoutOpt
+    density?: DensityOpt
+    displayMode?: DisplayModeOpt
+    sortOrder?: SortOpt
+    showImage?: boolean
+    showMeta?: boolean
+  }) {
+    setDisplay({ id: source._id, ...patch }).catch(() =>
+      toast.error('Échec de la mise à jour'),
+    )
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Affichage — {source.name}</DialogTitle>
+          <DialogDescription>
+            Mise en page de cette source dans le digest.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <SettingRow label="Disposition">
+            <Tabs value={layout} onValueChange={(v) => save({ layout: v as LayoutOpt })}>
+              <TabsList>
+                <TabsTrigger value="list">Liste</TabsTrigger>
+                <TabsTrigger value="cards">Cartes</TabsTrigger>
+                <TabsTrigger value="grid">Grille</TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </SettingRow>
+
+          <SettingRow label="Densité">
+            <Tabs value={density} onValueChange={(v) => save({ density: v as DensityOpt })}>
+              <TabsList>
+                <TabsTrigger value="comfortable">Confort</TabsTrigger>
+                <TabsTrigger value="compact">Compact</TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </SettingRow>
+
+          {isBlog && (
+            <SettingRow label="Contenu">
+              <Tabs
+                value={displayMode}
+                onValueChange={(v) => save({ displayMode: v as DisplayModeOpt })}
+              >
+                <TabsList>
+                  <TabsTrigger value="title">Titre</TabsTrigger>
+                  <TabsTrigger value="excerpt">Extrait</TabsTrigger>
+                  <TabsTrigger value="full">Complet</TabsTrigger>
+                </TabsList>
+              </Tabs>
+            </SettingRow>
+          )}
+
+          {!isVideo && (
+            <SettingRow label="Tri">
+              <Tabs value={sortOrder} onValueChange={(v) => save({ sortOrder: v as SortOpt })}>
+                <TabsList>
+                  <TabsTrigger value="popular">Populaire</TabsTrigger>
+                  <TabsTrigger value="recent">Récent</TabsTrigger>
+                  <TabsTrigger value="hybrid">Hybride</TabsTrigger>
+                </TabsList>
+              </Tabs>
+            </SettingRow>
+          )}
+
+          <SettingRow label="Image">
+            <Switch checked={showImage} onCheckedChange={(v) => save({ showImage: v })} />
+          </SettingRow>
+          <SettingRow label="Métadonnées">
+            <Switch checked={showMeta} onCheckedChange={(v) => save({ showMeta: v })} />
+          </SettingRow>
+        </div>
       </DialogContent>
     </Dialog>
   )

@@ -49,18 +49,34 @@ export const latest = query({
         if (limit % 2 === 1) limit = Math.max(2, limit - 1) // keep the 2-per-row grid even
       }
 
-      // Over-fetch a little so filtering/dedup still leaves us close to `limit`.
-      const raw = SCORE_RANKED.has(source.type)
-        ? await ctx.db
-            .query('items')
-            .withIndex('by_source_score', (q) => q.eq('sourceId', source._id))
-            .order('desc')
-            .take(limit + 8)
-        : await ctx.db
-            .query('items')
-            .withIndex('by_source_published', (q) => q.eq('sourceId', source._id))
-            .order('desc')
-            .take(limit + 8)
+      // Ranking: explicit per-source sortOrder, else score for score-ranked
+      // source types and recency for the rest. Over-fetch so filtering/dedup
+      // still leaves us close to `limit`.
+      const sortOrder =
+        source.sortOrder ?? (SCORE_RANKED.has(source.type) ? 'popular' : 'recent')
+      const headroom = limit + 8
+      let raw: Doc<'items'>[]
+      if (sortOrder === 'popular') {
+        raw = await ctx.db
+          .query('items')
+          .withIndex('by_source_score', (q) => q.eq('sourceId', source._id))
+          .order('desc')
+          .take(headroom)
+      } else if (sortOrder === 'hybrid') {
+        // Most-popular within the recent window.
+        const recent = await ctx.db
+          .query('items')
+          .withIndex('by_source_published', (q) => q.eq('sourceId', source._id))
+          .order('desc')
+          .take(Math.max(headroom * 2, 24))
+        raw = recent.sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
+      } else {
+        raw = await ctx.db
+          .query('items')
+          .withIndex('by_source_published', (q) => q.eq('sourceId', source._id))
+          .order('desc')
+          .take(headroom)
+      }
 
       const items: Doc<'items'>[] = []
       for (const it of raw) {

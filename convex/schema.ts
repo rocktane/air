@@ -96,6 +96,19 @@ export default defineSchema({
     includeKeywords: v.optional(v.array(v.string())),
     excludeKeywords: v.optional(v.array(v.string())),
     minScore: v.optional(v.number()),
+    // Display options (improvements 1-3).
+    displayMode: v.optional(
+      v.union(v.literal('title'), v.literal('excerpt'), v.literal('full')),
+    ), // blogs/sites: title only / excerpt / full article inline
+    layout: v.optional(
+      v.union(v.literal('list'), v.literal('cards'), v.literal('grid')),
+    ),
+    density: v.optional(v.union(v.literal('comfortable'), v.literal('compact'))),
+    showImage: v.optional(v.boolean()),
+    showMeta: v.optional(v.boolean()),
+    sortOrder: v.optional(
+      v.union(v.literal('popular'), v.literal('recent'), v.literal('hybrid')),
+    ),
   })
     .index('by_position', ['position'])
     .index('by_digest_and_position', ['digestId', 'position']),
