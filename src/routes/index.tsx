@@ -17,6 +17,7 @@ import {
 import { useActiveDigest } from '@/lib/active-digest'
 import { useReads } from '@/lib/reads'
 import { WeatherWidget } from '@/components/weather-widget'
+import { DigestSummary } from '@/components/digest-summary'
 import { domainOf } from '@/lib/favicon'
 import { cn, openExternal, safeHref } from '@/lib/utils'
 
@@ -91,10 +92,13 @@ function Dashboard() {
       ) : filled.length === 0 ? (
         <EmptyDigest />
       ) : (
-        <div className="space-y-10">
-          {filled.map(({ source, items }) => (
-            <SourceSection key={source._id} source={source} items={items} />
-          ))}
+        <div className="space-y-8">
+          <DigestSummary digestId={activeId} />
+          <div className="space-y-10">
+            {filled.map(({ source, items }) => (
+              <SourceSection key={source._id} source={source} items={items} />
+            ))}
+          </div>
         </div>
       )}
     </div>

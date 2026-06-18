@@ -63,5 +63,9 @@ convex/
 
 - **Product Hunt**: register an app at producthunt.com/v2/oauth/applications to get a
   developer token, then `bunx convex env set PRODUCT_HUNT_TOKEN <token>`.
+- **AI summary** (digest dashboard): set an [OpenRouter](https://openrouter.ai) key with
+  `bunx convex env set OPENROUTER_API_KEY <key>`. The model defaults to
+  `deepseek/deepseek-chat`; pick another (e.g. DeepSeek V4 Pro) with
+  `bunx convex env set OPENROUTER_MODEL <slug>` (exact slug from openrouter.ai/models).
 - Sites behind Cloudflare / pure-SPA sites may need a Playwright (or Python/trafilatura)
   sidecar later — out of POC scope.

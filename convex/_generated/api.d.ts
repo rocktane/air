@@ -20,6 +20,7 @@ import type * as reader from "../reader.js";
 import type * as reads from "../reads.js";
 import type * as settings from "../settings.js";
 import type * as sources from "../sources.js";
+import type * as summary from "../summary.js";
 import type * as urls from "../urls.js";
 
 import type {
@@ -41,6 +42,7 @@ declare const fullApi: ApiFromModules<{
   reads: typeof reads;
   settings: typeof settings;
   sources: typeof sources;
+  summary: typeof summary;
   urls: typeof urls;
 }>;
 
