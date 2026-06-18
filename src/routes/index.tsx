@@ -16,6 +16,7 @@ import {
 } from '@/components/reader-pane'
 import { useActiveDigest } from '@/lib/active-digest'
 import { useReads } from '@/lib/reads'
+import { WeatherWidget } from '@/components/weather-widget'
 import { domainOf } from '@/lib/favicon'
 import { cn, openExternal, safeHref } from '@/lib/utils'
 
@@ -82,6 +83,8 @@ function Dashboard() {
         <h1 className="text-2xl font-semibold">{active?.name ?? 'Mon digest'}</h1>
         <p className="text-sm text-muted-foreground capitalize">{today}</p>
       </header>
+
+      <WeatherWidget />
 
       {isPending ? (
         <p className="text-center text-sm text-muted-foreground">Chargement…</p>

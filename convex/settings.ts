@@ -14,6 +14,8 @@ export const get = query({
       timezone: row?.timezone ?? 'Europe/Paris',
       maxItemsPerSource: row?.maxItemsPerSource ?? DEFAULT_MAX_ITEMS,
       openLinksInBackground: row?.openLinksInBackground ?? false,
+      weatherEnabled: row?.weatherEnabled ?? false,
+      weatherCities: row?.weatherCities ?? [],
     }
   },
 })
@@ -24,6 +26,8 @@ export const update = mutation({
     timezone: v.optional(v.string()),
     maxItemsPerSource: v.optional(v.number()),
     openLinksInBackground: v.optional(v.boolean()),
+    weatherEnabled: v.optional(v.boolean()),
+    weatherCities: v.optional(v.array(v.string())),
   },
   handler: async (ctx, args) => {
     const existing = await ctx.db.query('settings').first()
@@ -36,6 +40,8 @@ export const update = mutation({
       timezone: args.timezone ?? 'Europe/Paris',
       maxItemsPerSource: args.maxItemsPerSource ?? DEFAULT_MAX_ITEMS,
       openLinksInBackground: args.openLinksInBackground ?? false,
+      weatherEnabled: args.weatherEnabled,
+      weatherCities: args.weatherCities,
     })
   },
 })
