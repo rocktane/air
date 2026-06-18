@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type MouseEvent } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
 import { convexQuery } from '@convex-dev/react-query'
@@ -15,8 +15,9 @@ import {
   type ReaderItem,
 } from '@/components/reader-pane'
 import { useActiveDigest } from '@/lib/active-digest'
+import { useReads } from '@/lib/reads'
 import { domainOf } from '@/lib/favicon'
-import { cn, safeHref } from '@/lib/utils'
+import { cn, openExternal, safeHref } from '@/lib/utils'
 
 export const Route = createFileRoute('/')({
   component: Dashboard,
@@ -155,17 +156,54 @@ function SourceSection({ source, items }: { source: Doc<'sources'>; items: Doc<'
 }
 
 // Title link wiring: blogs/sites open in the reader pane on desktop (with hover
-// prefetch); everything else is a plain new-tab link.
+// prefetch); everything else is a plain new-tab link. Every open marks the item
+// read, and honors the "open in background tab" preference for new-tab opens.
 function useItemLink(item: Doc<'items'>, kind: string) {
   const openInPane = useOpenInPane()
+  const { isRead, markRead, toggle } = useReads()
+  const { data: settings } = useQuery(convexQuery(api.settings.get, {}))
+  const background = settings?.openLinksInBackground ?? false
   const isBlog = kind === 'rss' || kind === 'website'
   const hover = usePrefetchOnHover(item.url, isBlog)
   const reader: ReaderItem = { url: item.url, title: item.title }
+  const openPane = openInPane(reader)
+
+  const onClick = (e: MouseEvent) => {
+    markRead(item.url)
+    // Blogs/sites open in the reader pane (desktop, plain left-click); the hook
+    // preventDefaults when it takes over.
+    if (isBlog) {
+      openPane(e)
+      if (e.defaultPrevented) return
+    }
+    // Remaining new-tab opens (non-blogs, or blogs on mobile): honor the
+    // background-tab preference. Modifier/middle clicks keep native behavior.
+    if (
+      background &&
+      e.button === 0 &&
+      !e.metaKey &&
+      !e.ctrlKey &&
+      !e.shiftKey &&
+      !e.altKey &&
+      !e.defaultPrevented
+    ) {
+      e.preventDefault()
+      openExternal(item.url, true)
+    }
+  }
+  // Middle-click opens a new tab natively — still mark the item read.
+  const onAuxClick = (e: MouseEvent) => {
+    if (e.button === 1) markRead(item.url)
+  }
+
   return {
     href: safeHref(item.url),
-    onClick: isBlog ? openInPane(reader) : undefined,
+    onClick,
+    onAuxClick,
     hover,
     isBlog,
+    isRead: isRead(item.url),
+    toggleRead: () => toggle(item.url),
   }
 }
 
@@ -179,15 +217,33 @@ function TitleLink({
   className?: string
 }) {
   return (
-    <div className="flex items-center gap-1.5">
+    <div className="flex items-start gap-1.5">
+      <button
+        type="button"
+        onClick={(e) => {
+          e.preventDefault()
+          e.stopPropagation()
+          link.toggleRead()
+        }}
+        aria-label={link.isRead ? 'Marquer comme non lu' : 'Marquer comme lu'}
+        title={link.isRead ? 'Marquer comme non lu' : 'Marquer comme lu'}
+        className={cn(
+          'mt-[0.4rem] size-2 shrink-0 rounded-full border transition-colors',
+          link.isRead
+            ? 'border-muted-foreground/40 hover:bg-muted-foreground/20'
+            : 'border-primary bg-primary hover:opacity-70',
+        )}
+      />
       <a
         href={link.href}
         target="_blank"
         rel="noreferrer"
         onClick={link.onClick}
+        onAuxClick={link.onAuxClick}
         {...link.hover}
         className={cn(
-          'font-medium text-foreground underline-offset-4 hover:underline',
+          'font-medium underline-offset-4 hover:underline',
+          link.isRead ? 'text-muted-foreground' : 'text-foreground',
           className,
         )}
       >
@@ -296,7 +352,7 @@ function DigestRow({ item, opts }: { item: Doc<'items'>; opts: RenderOpts }) {
   const wantFull = link.isBlog && opts.displayMode === 'full'
 
   return (
-    <article className="flex items-stretch gap-3">
+    <article className={cn('flex items-stretch gap-3', link.isRead && 'opacity-60')}>
       {opts.showImage &&
         item.imageUrl &&
         (isPH ? <Thumbnail src={item.imageUrl} fill /> : <Thumbnail src={item.imageUrl} />)}
@@ -337,13 +393,19 @@ function ItemCard({
   const wantExcerpt = link.isBlog ? opts.displayMode !== 'title' : !!item.excerpt
 
   return (
-    <article className={cn(bordered && 'overflow-hidden rounded-lg border bg-card')}>
+    <article
+      className={cn(
+        bordered && 'overflow-hidden rounded-lg border bg-card',
+        link.isRead && 'opacity-60',
+      )}
+    >
       {opts.showImage && item.imageUrl && (
         <a
           href={link.href}
           target="_blank"
           rel="noreferrer"
           onClick={link.onClick}
+          onAuxClick={link.onAuxClick}
           {...link.hover}
           className="block"
         >

@@ -375,6 +375,35 @@ function DigestSettings({ digest }: { digest: Doc<'digests'> }) {
         </CardContent>
       </Card>
 
+      {/* Links & reading */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Liens & lecture</CardTitle>
+          <CardDescription>
+            Comportement des liens du digest. Un article ouvert est marqué comme lu
+            (clique la pastille à gauche d'un titre pour basculer lu / non lu).
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <Label htmlFor="bg-links">Ouvrir les liens en arrière-plan</Label>
+              <p className="text-xs text-muted-foreground">
+                Le nouvel onglet s'ouvre derrière la page courante au lieu de passer
+                au premier plan.
+              </p>
+            </div>
+            <Switch
+              id="bg-links"
+              checked={settings?.openLinksInBackground ?? false}
+              onCheckedChange={(openLinksInBackground) =>
+                updateSettings({ openLinksInBackground }).catch(fail)
+              }
+            />
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Global default */}
       <Card>
         <CardHeader>

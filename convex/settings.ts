@@ -13,6 +13,7 @@ export const get = query({
       schedule: row?.schedule ?? ('daily' as const),
       timezone: row?.timezone ?? 'Europe/Paris',
       maxItemsPerSource: row?.maxItemsPerSource ?? DEFAULT_MAX_ITEMS,
+      openLinksInBackground: row?.openLinksInBackground ?? false,
     }
   },
 })
@@ -22,6 +23,7 @@ export const update = mutation({
     schedule: v.optional(v.union(v.literal('daily'), v.literal('weekly'))),
     timezone: v.optional(v.string()),
     maxItemsPerSource: v.optional(v.number()),
+    openLinksInBackground: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const existing = await ctx.db.query('settings').first()
@@ -33,6 +35,7 @@ export const update = mutation({
       schedule: args.schedule ?? 'daily',
       timezone: args.timezone ?? 'Europe/Paris',
       maxItemsPerSource: args.maxItemsPerSource ?? DEFAULT_MAX_ITEMS,
+      openLinksInBackground: args.openLinksInBackground ?? false,
     })
   },
 })

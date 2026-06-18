@@ -144,10 +144,20 @@ export default defineSchema({
     .index('by_digest_and_createdAt', ['digestId', 'createdAt'])
     .index('by_slug', ['slug']),
 
+  // Per-link "read" marks. Keyed by url so the state survives item re-fetches
+  // and cache wipes (items are deleted/re-inserted; their _id is not stable).
+  reads: defineTable({
+    url: v.string(),
+    readAt: v.number(),
+  }).index('by_url', ['url']),
+
   // Single-user global settings for the POC.
   settings: defineTable({
     schedule: v.union(v.literal('daily'), v.literal('weekly')),
     timezone: v.string(),
     maxItemsPerSource: v.number(),
+    // Open digest links in a background tab (behind the current one) instead of
+    // bringing the new tab to the foreground.
+    openLinksInBackground: v.optional(v.boolean()),
   }),
 })

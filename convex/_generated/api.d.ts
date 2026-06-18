@@ -17,6 +17,7 @@ import type * as fetchers from "../fetchers.js";
 import type * as filtering from "../filtering.js";
 import type * as items from "../items.js";
 import type * as reader from "../reader.js";
+import type * as reads from "../reads.js";
 import type * as settings from "../settings.js";
 import type * as sources from "../sources.js";
 import type * as urls from "../urls.js";
@@ -37,6 +38,7 @@ declare const fullApi: ApiFromModules<{
   filtering: typeof filtering;
   items: typeof items;
   reader: typeof reader;
+  reads: typeof reads;
   settings: typeof settings;
   sources: typeof sources;
   urls: typeof urls;
