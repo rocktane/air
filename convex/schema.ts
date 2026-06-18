@@ -159,5 +159,8 @@ export default defineSchema({
     // Open digest links in a background tab (behind the current one) instead of
     // bringing the new tab to the foreground.
     openLinksInBackground: v.optional(v.boolean()),
+    // Today's-weather widget at the top of the digest.
+    weatherEnabled: v.optional(v.boolean()),
+    weatherCities: v.optional(v.array(v.string())), // free-text city names
   }),
 })

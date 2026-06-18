@@ -102,6 +102,10 @@ function DigestSettings({ digest }: { digest: Doc<'digests'> }) {
   const [minScore, setMinScore] = useState(String(digest.minScore ?? 0))
   const [sending, setSending] = useState(false)
 
+  // Weather cities are global (not per-digest). Seed the uncontrolled input via
+  // `key` so it remounts with the persisted value on load / external change.
+  const citiesValue = joinKeywords(settings?.weatherCities)
+
   const id = digest._id
   const fail = () => toast.error('Échec de la sauvegarde')
 
@@ -400,6 +404,43 @@ function DigestSettings({ digest }: { digest: Doc<'digests'> }) {
                 updateSettings({ openLinksInBackground }).catch(fail)
               }
             />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Weather widget */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Météo</CardTitle>
+          <CardDescription>
+            Affiche la météo du jour en haut du digest, pour une ou plusieurs villes.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between gap-4">
+            <Label htmlFor="weather-enabled">Activer le widget météo</Label>
+            <Switch
+              id="weather-enabled"
+              checked={settings?.weatherEnabled ?? false}
+              onCheckedChange={(weatherEnabled) =>
+                updateSettings({ weatherEnabled }).catch(fail)
+              }
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="weather-cities">Villes</Label>
+            <Input
+              key={citiesValue}
+              id="weather-cities"
+              placeholder="Paris, Lyon, Tokyo"
+              defaultValue={citiesValue}
+              onBlur={(e) =>
+                updateSettings({ weatherCities: parseKeywords(e.target.value) }).catch(fail)
+              }
+            />
+            <p className="text-xs text-muted-foreground">
+              Une ou plusieurs villes séparées par des virgules. Données Open-Meteo.
+            </p>
           </div>
         </CardContent>
       </Card>
